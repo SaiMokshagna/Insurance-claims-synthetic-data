@@ -10,3 +10,14 @@ def derive_policy_status(cancellation_date, lapse_date, expiry_date, reference_d
     if expiry_date < reference_date:
         return "EXPIRED"
     return "IN_FORCE"
+
+def derive_prior_claims(claims, policies):
+    """For each claim, count the same customer's earlier claims in the prior
+    365 days. `claims` must be in submission-time order (claim_id order)."""
+    customer_of = policies.set_index("policy_id")["customer_id"]
+    history, counts = {}, []
+    for policy_id, submitted in zip(claims["policy_id"], claims["submitted_date"]):
+        past = history.setdefault(customer_of[policy_id], [])
+        counts.append(sum(1 for d in past if (submitted - d).days <= 365))
+        past.append(submitted)
+    return counts

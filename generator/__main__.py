@@ -9,7 +9,8 @@ from generator.config import (
 )
 from generator.export import write_tables
 from generator.master import generate_master
-from generator.validate import print_report, validate_master
+from generator.transactions import generate_transactions
+from generator.validate import print_report, validate_master, validate_transactions
 
 
 def parse_args():
@@ -26,16 +27,21 @@ def main():
     rng = np.random.default_rng(args.seed)  # the ONE RNG for the whole run
 
     print(f"Seed: {args.seed} | Reference date: {REFERENCE_DATE}")
-    tables = generate_master(rng, args.policies, args.claims)
+    master = generate_master(rng, args.policies, args.claims)
+    tables = {**master, **generate_transactions(rng, master, args.claims)}
 
     print("\nRow counts:")
     for name, df in tables.items():
         print(f"  {name}: {len(df)}")
     print("\nPolicy status mix:")
     print(tables["policies"]["status"].value_counts().to_string())
+    print("\nClaim type mix:")
+    print(tables["claims"]["claim_type"].value_counts().to_string())
+    print("\nDocument status mix:")
+    print(tables["documents"]["status"].value_counts().to_string())
 
     print("\nValidation:")
-    failed = print_report(validate_master(tables))
+    failed = print_report(validate_master(tables) + validate_transactions(tables))
 
     write_tables(tables, args.out)
     print(f"\nCSV files written to {args.out.resolve()}")

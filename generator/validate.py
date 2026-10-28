@@ -4,11 +4,14 @@ import pandas as pd
 
 from generator.config import CLAIM_TYPES, PRODUCTS, REFERENCE_DATE
 from generator.ids import ID_PATTERNS
-from generator.reference_data import ALL_EXCLUSIONS
+from generator.reference_data import (
+    ALL_EXCLUSIONS, DOCUMENT_TYPES, ITEM_CATEGORIES, REQUIRED_DOCUMENTS,
+)
 
 POLICY_STATUSES = ["IN_FORCE", "EXPIRED", "LAPSED", "CANCELLED"]
 RISK_TIERS = ["LOW", "MEDIUM", "HIGH"]
 SENIORITIES = ["JUNIOR", "SENIOR", "MANAGER"]
+DOC_STATUSES = ["REQUESTED", "RECEIVED", "VERIFIED", "REJECTED"]
 
 
 def _result(name, bad_count):
@@ -107,6 +110,111 @@ def validate_master(t):
                       (pd.to_datetime(pm["expiry_date"]) > pd.to_datetime(pm["expiry_date_policy"]))).sum()))
     return r
 
+def validate_transactions(t):
+    p, cov, pc = t["policies"], t["coverages"], t["policy_coverages"]
+    inc, clm, itm, doc = t["incidents"], t["claims"], t["claim_items"], t["documents"]
+    ref = pd.Timestamp(REFERENCE_DATE)
+    r = []
+
+    # --- incidents ---
+    r += [_unique(inc, "incident_id", "incidents"),
+          _pattern(inc, "incident_id", "incident", "incidents"),
+          _fk(inc, "policy_id", p, "policy_id", "incidents.policy_id -> policies"),
+          _enum(inc, "incident_type", CLAIM_TYPES, "incidents")]
+    im = inc.merge(p[["policy_id", "effective_date", "expiry_date",
+                      "cancellation_date", "lapse_date"]], on="policy_id")
+    idate, eff = pd.to_datetime(im["incident_date"]), pd.to_datetime(im["effective_date"])
+    end = pd.concat([pd.to_datetime(im["expiry_date"]), pd.to_datetime(im["cancellation_date"]),
+                     pd.to_datetime(im["lapse_date"])], axis=1).min(axis=1)
+    r.append(_result("incidents: incident_date inside policy coverage period",
+                     ((idate < eff) | (idate > end)).sum()))
+    r.append(_result("incidents: incident_date not in the future", (idate > ref).sum()))
+
+    # --- claims ---
+    r += [_unique(clm, "claim_id", "claims"), _pattern(clm, "claim_id", "claim", "claims"),
+          _fk(clm, "policy_id", p, "policy_id", "claims.policy_id -> policies"),
+          _fk(clm, "incident_id", inc, "incident_id", "claims.incident_id -> incidents"),
+          _fk(clm, "coverage_id", cov, "coverage_id", "claims.coverage_id -> coverages")]
+    pc_pairs = set(zip(pc["policy_id"], pc["coverage_id"]))
+    r.append(_result("claims: coverage is attached to the claim's policy",
+                     sum(pair not in pc_pairs for pair in zip(clm["policy_id"], clm["coverage_id"]))))
+    cm = (clm.merge(inc[["incident_id", "policy_id", "incident_type", "incident_date",
+                         "exclusion_triggered"]], on="incident_id", suffixes=("", "_inc"))
+             .merge(cov[["coverage_id", "coverage_type"]], on="coverage_id"))
+    r.append(_result("claims: incident belongs to the same policy",
+                     (cm["policy_id"] != cm["policy_id_inc"]).sum()))
+    r.append(_result("claims: claim_type equals incident_type",
+                     (cm["claim_type"] != cm["incident_type"]).sum()))
+    r.append(_result("claims: claim_type equals coverage_type",
+                     (cm["claim_type"] != cm["coverage_type"]).sum()))
+    sub, inc_d = pd.to_datetime(cm["submitted_date"]), pd.to_datetime(cm["incident_date"])
+    r.append(_result("claims: submitted_date >= incident_date and <= reference date",
+                     ((sub < inc_d) | (sub > ref)).sum()))
+    r.append(_result("claims: reporting_delay_days = submitted - incident",
+                     (cm["reporting_delay_days"] != (sub - inc_d).dt.days).sum()))
+    sums = itm.groupby("claim_id")["claimed_amount"].sum()
+    item_total = clm["claim_id"].map(sums)
+    r.append(_result("claims: claimed_amount equals sum of its items",
+                     (((clm["claimed_amount"] - item_total).abs() > 0.005) | item_total.isna()).sum()))
+    em = cm[cm["exclusion_triggered"].notna()].merge(
+        pc[["policy_id", "coverage_id", "exclusions"]], on=["policy_id", "coverage_id"])
+    r.append(_result("incidents: triggered exclusion is one the coverage actually has",
+                     sum(ex not in exs.split("|")
+                         for ex, exs in zip(em["exclusion_triggered"], em["exclusions"]))))
+    cust = p.set_index("policy_id")["customer_id"]
+    cc = clm[["claim_id", "policy_id", "submitted_date"]].copy()
+    cc["customer_id"] = cc["policy_id"].map(cust)
+    cc["submitted_date"] = pd.to_datetime(cc["submitted_date"])
+    pairs = cc.merge(cc, on="customer_id", suffixes=("", "_prev"))
+    earlier = pairs[(pairs["claim_id_prev"] < pairs["claim_id"]) &
+                    ((pairs["submitted_date"] - pairs["submitted_date_prev"]).dt.days <= 365)]
+    expected = earlier.groupby("claim_id").size().reindex(clm["claim_id"]).fillna(0).astype(int).values
+    r.append(_result("claims: prior_claims_12m matches independent recount",
+                     (clm["prior_claims_12m"].values != expected).sum()))
+
+    # --- claim_items ---
+    r += [_unique(itm, "claim_item_id", "claim_items"),
+          _pattern(itm, "claim_item_id", "claim_item", "claim_items"),
+          _fk(itm, "claim_id", clm, "claim_id", "claim_items.claim_id -> claims")]
+    r.append(_result("claim_items: claimed_amount > 0", (itm["claimed_amount"] <= 0).sum()))
+    r.append(_result("claims: every claim has at least one item",
+                     len(set(clm["claim_id"]) - set(itm["claim_id"]))))
+    ic = itm.merge(clm[["claim_id", "claim_type"]], on="claim_id")
+    r.append(_result("claim_items: category allowed for the claim type",
+                     sum(c not in ITEM_CATEGORIES[ct] for c, ct in zip(ic["item_category"], ic["claim_type"]))))
+    r.append(_result("claim_items: item ID embeds its claim_id",
+                     sum(not i.startswith(f"ITM-{c}-") for i, c in zip(itm["claim_item_id"], itm["claim_id"]))))
+
+    # --- documents ---
+    r += [_unique(doc, "document_id", "documents"),
+          _pattern(doc, "document_id", "document", "documents"),
+          _fk(doc, "claim_id", clm, "claim_id", "documents.claim_id -> claims"),
+          _enum(doc, "document_type", DOCUMENT_TYPES, "documents"),
+          _enum(doc, "status", DOC_STATUSES, "documents")]
+    r.append(_result("documents: document ID embeds its claim_id",
+                     sum(not i.startswith(f"DOC-{c}-") for i, c in zip(doc["document_id"], doc["claim_id"]))))
+    dm = doc.merge(clm[["claim_id", "claim_type", "submitted_date"]], on="claim_id")
+    r.append(_result("documents: is_mandatory matches the required-documents rule",
+                     sum(bool(m) != (d in REQUIRED_DOCUMENTS[ct]) for m, d, ct in
+                         zip(dm["is_mandatory"], dm["document_type"], dm["claim_type"]))))
+    got = dm["status"].isin(["RECEIVED", "VERIFIED", "REJECTED"])
+    r.append(_result("documents: received_date set iff status is received",
+                     (got != dm["received_date"].notna()).sum()))
+    r.append(_result("documents: file_name and file_size_kb set iff received",
+                     ((got != dm["file_name"].notna()) | (got != dm["file_size_kb"].notna())).sum()))
+    d_sub = pd.to_datetime(dm["submitted_date"])
+    d_rec, d_req = pd.to_datetime(dm["received_date"]), pd.to_datetime(dm["requested_date"])
+    r.append(_result("documents: received_date between submitted_date and reference date",
+                     (d_rec.notna() & ((d_rec < d_sub) | (d_rec > ref))).sum()))
+    r.append(_result("documents: requested_date between submitted_date and reference date",
+                     (d_req.notna() & ((d_req < d_sub) | (d_req > ref))).sum()))
+    r.append(_result("documents: REQUESTED rows have a requested_date",
+                     ((dm["status"] == "REQUESTED") & d_req.isna()).sum()))
+    have = doc[doc["is_mandatory"]].groupby("claim_id")["document_type"].apply(list)
+    r.append(_result("documents: each claim has every mandatory document type exactly once",
+                     sum(sorted(REQUIRED_DOCUMENTS[ct]) != sorted(have.get(cid, []))
+                         for cid, ct in zip(clm["claim_id"], clm["claim_type"]))))
+    return r
 
 def print_report(results):
     for res in results:

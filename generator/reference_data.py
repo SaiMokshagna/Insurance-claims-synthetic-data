@@ -45,3 +45,55 @@ ALL_EXCLUSIONS = {
 PRODUCT_WEIGHTS = {"AUTO": 0.35, "HOME": 0.30, "HLTH": 0.20, "LIAB": 0.15}
 BASE_PREMIUM = {"AUTO": 900.0, "HOME": 1400.0, "HLTH": 2800.0, "LIAB": 600.0}
 APPROVAL_AUTHORITY = {"JUNIOR": 5000.0, "SENIOR": 25000.0, "MANAGER": 100000.0}
+
+CLAIM_TYPE_WEIGHTS = {
+    "AUTO_COLLISION": 3.0, "PROPERTY_DAMAGE": 2.0, "THEFT": 1.0,
+    "MEDICAL": 3.0, "LIABILITY": 4.0,
+}
+
+DOCUMENT_TYPES = [
+    "CLAIM_FORM", "POLICE_REPORT", "PHOTOS", "REPAIR_ESTIMATE",
+    "MEDICAL_REPORT", "PROOF_OF_OWNERSHIP", "INVOICE",
+]
+REQUIRED_DOCUMENTS = {   # data dictionary, section 7
+    "AUTO_COLLISION": ["CLAIM_FORM", "PHOTOS", "REPAIR_ESTIMATE"],
+    "PROPERTY_DAMAGE": ["CLAIM_FORM", "PHOTOS", "REPAIR_ESTIMATE"],
+    "THEFT": ["CLAIM_FORM", "POLICE_REPORT", "PROOF_OF_OWNERSHIP"],
+    "MEDICAL": ["CLAIM_FORM", "MEDICAL_REPORT", "INVOICE"],
+    "LIABILITY": ["CLAIM_FORM", "POLICE_REPORT", "INVOICE"],
+}
+OPTIONAL_DOCUMENTS = {   # never overlap with the required list
+    "AUTO_COLLISION": ["POLICE_REPORT", "INVOICE"],
+    "PROPERTY_DAMAGE": ["INVOICE", "POLICE_REPORT"],
+    "THEFT": ["PHOTOS", "INVOICE"],
+    "MEDICAL": [],
+    "LIABILITY": ["PHOTOS", "REPAIR_ESTIMATE"],
+}
+
+ITEM_CATEGORIES = {
+    "AUTO_COLLISION": ["REPAIR", "REPLACEMENT"],
+    "PROPERTY_DAMAGE": ["REPAIR", "REPLACEMENT"],
+    "THEFT": ["REPLACEMENT"],
+    "MEDICAL": ["HOSPITAL", "MEDICATION"],
+    "LIABILITY": ["THIRD_PARTY_DAMAGE", "REPAIR"],
+}
+ITEM_DESCRIPTIONS = {
+    "REPAIR": ["Body and panel repair", "Structural repair", "Glass and fittings repair"],
+    "REPLACEMENT": ["Replacement of damaged parts", "Replacement of lost items",
+                    "Replacement of damaged contents"],
+    "HOSPITAL": ["Hospital admission charges", "Emergency room treatment", "Diagnostic tests"],
+    "MEDICATION": ["Prescribed medication", "Follow-up pharmacy charges"],
+    "THIRD_PARTY_DAMAGE": ["Damage to third-party property", "Third-party injury compensation"],
+}
+INCIDENT_DESCRIPTIONS = {
+    "AUTO_COLLISION": ["Rear-end collision at traffic signal", "Side impact at intersection",
+                       "Collision with parked vehicle"],
+    "PROPERTY_DAMAGE": ["Water damage from burst pipe", "Storm damage to roof",
+                        "Fire damage in kitchen"],
+    "THEFT": ["Break-in while property unattended", "Theft from insured premises or vehicle",
+              "Reported theft of insured items"],
+    "MEDICAL": ["Emergency hospital admission", "Surgery following injury",
+                "Outpatient treatment after accident"],
+    "LIABILITY": ["Visitor injured on insured premises", "Damage to neighbouring property",
+                  "Third-party injury claim"],
+}
