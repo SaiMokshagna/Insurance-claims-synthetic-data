@@ -391,9 +391,11 @@ def print_report(results):
     return failed
 
 def validate_rules(t):
-    """Cross-entity rule checks. All pass on clean data; defects make them fail."""
-    p, clm, doc, stl = t["policies"], t["claims"], t["documents"], t["settlements"]
+    """Cross-entity rule checks. All pass on clean data; Layer B defects make some fail."""
+    p, clm, doc = t["policies"], t["claims"], t["documents"]
+    stl, asm, rsv = t["settlements"], t["assessments"], t["reserves"]
     r = []
+
     cm = clm.merge(p[["policy_id", "effective_date"]], on="policy_id")
     r.append(_result("claims: submitted_date on or after policy effective_date",
                      (pd.to_datetime(cm["submitted_date"]) < pd.to_datetime(cm["effective_date"])).sum()))
@@ -404,6 +406,18 @@ def validate_rules(t):
     not_received = mandatory[~mandatory["status"].isin(["RECEIVED", "VERIFIED"])]
     r.append(_result("rules: paid claims have every mandatory document",
                      len(set(paid["claim_id"]) & set(not_received["claim_id"]))))
+
+    # --- added in M7 ---
+    order = pd.to_datetime(clm.sort_values("claim_id")["submitted_date"])
+    r.append(_result("claims: claim_id order follows submitted_date", (order.diff().dt.days < 0).sum()))
+    sm = stl.merge(asm[["assessment_id", "assessed_date"]], on="assessment_id")
+    r.append(_result("settlements: approved_date on or after assessed_date",
+                     (pd.to_datetime(sm["approved_date"]) < pd.to_datetime(sm["assessed_date"])).sum()))
+    closed = set(clm.loc[clm["current_status"] == "CLOSED", "claim_id"])
+    settled = set(stl.loc[stl["settlement_status"].isin(["PAID", "REJECTED"]), "claim_id"])
+    r.append(_result("rules: closed claims have a PAID or REJECTED settlement", len(closed - settled)))
+    released = set(rsv.loc[rsv["reserve_type"] == "REVISED", "claim_id"])
+    r.append(_result("rules: paid claims have their reserve released", len(set(paid["claim_id"]) - released)))
     return r
 
 
