@@ -42,3 +42,18 @@ AUTO_APPROVE_MAX = 5000.0     # payouts up to this (and low fraud score) auto-ap
 REVIEW_SCORE = 30             # fraud score that forces senior review
 FRAUD_REFERRAL_SCORE = 50     # fraud score that triggers investigation
 RULE_VERSION = "RULES-1.0"
+
+# --- Anomaly plan: counts per 1,000 claims (scaled for other sizes) ---
+ANOMALY_PLAN_PER_1000 = {
+    # Layer A: built as INPUTS, so the workflow handles them by the rules
+    "DUPLICATE_CLAIM": 15,
+    "DUPLICATE_INCIDENT": 15,
+    "FRAUD_SUSPECTED": 30,
+    # Layer B: edits to FINISHED records, so the recorded data breaks a rule
+    "CLAIM_BEFORE_POLICY_START": 12,
+    "POLICY_CANCELLED_BEFORE_INCIDENT": 12,
+    "INCIDENT_OUTSIDE_COVERAGE": 16,
+    "SETTLEMENT_EXCEEDS_LIMIT": 15,
+    "MISSING_MANDATORY_DOCUMENT": 15,
+    "CLAIM_PAID_TWICE": 12,
+}

@@ -389,3 +389,33 @@ def print_report(results):
     failed = sum(not res["passed"] for res in results)
     print(f"\n{len(results) - failed}/{len(results)} checks passed")
     return failed
+
+def validate_rules(t):
+    """Cross-entity rule checks. All pass on clean data; defects make them fail."""
+    p, clm, doc, stl = t["policies"], t["claims"], t["documents"], t["settlements"]
+    r = []
+    cm = clm.merge(p[["policy_id", "effective_date"]], on="policy_id")
+    r.append(_result("claims: submitted_date on or after policy effective_date",
+                     (pd.to_datetime(cm["submitted_date"]) < pd.to_datetime(cm["effective_date"])).sum()))
+    paid = stl[stl["settlement_status"] == "PAID"]
+    r.append(_result("rules: every claim is paid at most once",
+                     (paid.groupby("claim_id").size() > 1).sum()))
+    mandatory = doc[doc["is_mandatory"].astype(bool)]
+    not_received = mandatory[~mandatory["status"].isin(["RECEIVED", "VERIFIED"])]
+    r.append(_result("rules: paid claims have every mandatory document",
+                     len(set(paid["claim_id"]) & set(not_received["claim_id"]))))
+    return r
+
+
+def validate_all(t):
+    return validate_master(t) + validate_transactions(t) + validate_workflow(t) + validate_rules(t)
+
+
+def print_report(results, verbose=False):
+    failed = [res for res in results if not res["passed"]]
+    for res in (results if verbose else failed):
+        tag = "PASS" if res["passed"] else "FAIL"
+        extra = "" if res["passed"] else f"  ({res['bad_rows']} bad rows)"
+        print(f"[{tag}] {res['check']}{extra}")
+    print(f"{len(results) - len(failed)}/{len(results)} checks passed")
+    return len(failed)
