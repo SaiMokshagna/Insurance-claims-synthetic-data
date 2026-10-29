@@ -4,6 +4,7 @@ from generator.config import CLAIM_TYPES
 from generator.master import generate_master
 from generator.transactions import generate_transactions
 from generator.validate import validate_master, validate_transactions
+from generator.rules import find_duplicates
 
 
 def make(seed=20261022, policies=300, claims=200):
@@ -41,3 +42,7 @@ def test_validation_passes():
     t = make()
     failed = [r for r in validate_master(t) + validate_transactions(t) if not r["passed"]]
     assert failed == []
+    
+def test_baseline_has_no_accidental_duplicates():
+    t = make()
+    assert find_duplicates(t["claims"], t["incidents"]) == {}

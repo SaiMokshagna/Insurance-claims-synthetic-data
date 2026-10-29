@@ -34,3 +34,10 @@ P_EXCLUSION_TRIGGERED = 0.04            # incidents involving an excluded peril
 P_EXTRA_DOCUMENT = 0.30                 # claims with a non-mandatory extra document
 CLAIM_AMOUNT_MEDIAN_FRACTION = 0.22     # median claim = 22% of coverage limit
 CLAIM_AMOUNT_SIGMA = 0.9                # spread; gives roughly 5% over the limit
+
+# --- Business rule parameters ---
+DOC_DEADLINE_DAYS = 30        # days a requested document may stay outstanding
+EARLY_CLAIM_DAYS = 30         # incident this soon after policy start is a fraud indicator
+AUTO_APPROVE_MAX = 5000.0     # payouts up to this (and low fraud score) auto-approve
+REVIEW_SCORE = 30             # fraud score that forces senior review
+FRAUD_REFERRAL_SCORE = 50     # fraud score that triggers investigation

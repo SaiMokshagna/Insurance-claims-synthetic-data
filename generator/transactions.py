@@ -185,10 +185,24 @@ def generate_transactions(rng, master, n_claims):
     candidates = _build_candidates(master["policies"], master["policy_coverages"],
                                    master["coverages"])
     weights = np.array([c["weight"] for c in candidates], dtype=float)
-    chosen = rng.choice(len(candidates), size=n_claims, p=weights / weights.sum())
+    probs = weights / weights.sum()
+    chosen = rng.choice(len(candidates), size=n_claims, p=probs)
     city_of = master["customers"].set_index("customer_id")["city"].to_dict()
 
-    specs = [_draw_claim_spec(rng, candidates[int(idx)], city_of, order)
-             for order, idx in enumerate(chosen)]
+    specs, used = [], set()
+    for order, idx in enumerate(chosen):
+        cand = candidates[int(idx)]
+        attempts = 0
+        while True:
+            spec = _draw_claim_spec(rng, cand, city_of, order)
+            key = (spec["policy_id"], spec["claim_type"], spec["incident_date"])
+            if key not in used:
+                break
+            attempts += 1
+            if attempts % 10 == 0:     # this coverage keeps colliding: try another one
+                cand = candidates[int(rng.choice(len(candidates), p=probs))]
+        used.add(key)
+        specs.append(spec)
+
     specs.sort(key=lambda s: (s["submitted_date"], s["order"]))
     return _build_tables(specs, master)
