@@ -10,7 +10,10 @@ from generator.config import (
 from generator.export import write_tables
 from generator.master import generate_master
 from generator.transactions import generate_transactions
-from generator.validate import print_report, validate_master, validate_transactions
+from generator.validate import (
+    print_report, validate_master, validate_transactions, validate_workflow,
+)
+from generator.workflow import generate_workflow
 
 
 def parse_args():
@@ -29,19 +32,21 @@ def main():
     print(f"Seed: {args.seed} | Reference date: {REFERENCE_DATE}")
     master = generate_master(rng, args.policies, args.claims)
     tables = {**master, **generate_transactions(rng, master, args.claims)}
+    tables.update(generate_workflow(rng, tables))     # replaces claims with the updated status
 
     print("\nRow counts:")
     for name, df in tables.items():
         print(f"  {name}: {len(df)}")
-    print("\nPolicy status mix:")
-    print(tables["policies"]["status"].value_counts().to_string())
-    print("\nClaim type mix:")
-    print(tables["claims"]["claim_type"].value_counts().to_string())
-    print("\nDocument status mix:")
-    print(tables["documents"]["status"].value_counts().to_string())
+    for title, col, table in [("Policy status mix", "status", "policies"),
+                              ("Claim status mix", "current_status", "claims"),
+                              ("Settlement status mix", "settlement_status", "settlements"),
+                              ("Event counts by entity", "entity_type", "status_events")]:
+        print(f"\n{title}:")
+        print(tables[table][col].value_counts().to_string())
 
     print("\nValidation:")
-    failed = print_report(validate_master(tables) + validate_transactions(tables))
+    results = validate_master(tables) + validate_transactions(tables) + validate_workflow(tables)
+    failed = print_report(results)
 
     write_tables(tables, args.out)
     print(f"\nCSV files written to {args.out.resolve()}")

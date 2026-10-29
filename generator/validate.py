@@ -1,6 +1,7 @@
 """Validation checks. Each check returns {check, passed, bad_rows}."""
 import numpy as np
 import pandas as pd
+from generator.rules import REASON_CODES
 
 from generator.config import CLAIM_TYPES, PRODUCTS, REFERENCE_DATE
 from generator.ids import ID_PATTERNS
@@ -12,7 +13,21 @@ POLICY_STATUSES = ["IN_FORCE", "EXPIRED", "LAPSED", "CANCELLED"]
 RISK_TIERS = ["LOW", "MEDIUM", "HIGH"]
 SENIORITIES = ["JUNIOR", "SENIOR", "MANAGER"]
 DOC_STATUSES = ["REQUESTED", "RECEIVED", "VERIFIED", "REJECTED"]
-
+CLAIM_TRANSITIONS = {
+    None: {"SUBMITTED"}, "SUBMITTED": {"UNDER_REVIEW"},
+    "UNDER_REVIEW": {"DOCS_REQUESTED", "ASSESSED"}, "DOCS_REQUESTED": {"UNDER_REVIEW"},
+    "ASSESSED": {"APPROVED", "REJECTED", "REFERRED"}, "APPROVED": {"PAID"},
+    "PAID": {"CLOSED"}, "REJECTED": {"CLOSED"}, "REFERRED": {"APPROVED", "REJECTED"},
+}
+SETTLEMENT_TRANSITIONS = {None: {"RECOMMENDED"}, "RECOMMENDED": {"APPROVED", "REJECTED"},
+                          "APPROVED": {"PAID", "CANCELLED"}}
+DOCUMENT_TRANSITIONS = {None: {"REQUESTED", "RECEIVED"}, "REQUESTED": {"RECEIVED"},
+                        "RECEIVED": {"VERIFIED", "REJECTED"}}
+POLICY_TRANSITIONS = {None: {"IN_FORCE"}, "IN_FORCE": {"CANCELLED", "LAPSED", "EXPIRED"}}
+TRANSITIONS = {"CLAIM": CLAIM_TRANSITIONS, "SETTLEMENT": SETTLEMENT_TRANSITIONS,
+               "DOCUMENT": DOCUMENT_TRANSITIONS, "POLICY": POLICY_TRANSITIONS}
+ELIGIBILITY_DECISIONS = ["ELIGIBLE", "PARTIALLY_ELIGIBLE", "INELIGIBLE",
+                         "PENDING_DOCUMENTS", "REFER_INVESTIGATION"]
 
 def _result(name, bad_count):
     return {"check": name, "passed": int(bad_count) == 0, "bad_rows": int(bad_count)}
@@ -214,6 +229,156 @@ def validate_transactions(t):
     r.append(_result("documents: each claim has every mandatory document type exactly once",
                      sum(sorted(REQUIRED_DOCUMENTS[ct]) != sorted(have.get(cid, []))
                          for cid, ct in zip(clm["claim_id"], clm["claim_type"]))))
+    return r
+
+def validate_workflow(t):
+    p, doc, clm, pc = t["policies"], t["documents"], t["claims"], t["policy_coverages"]
+    adj, asg, asm = t["adjusters"], t["claim_assignments"], t["assessments"]
+    rsv, stl, ev = t["reserves"], t["settlements"], t["status_events"]
+    ref = pd.Timestamp(REFERENCE_DATE)
+    r = []
+
+    def days(series):
+        return pd.to_datetime(series)
+
+    # --- claim_assignments ---
+    r += [_unique(asg, "assignment_id", "claim_assignments"),
+          _pattern(asg, "assignment_id", "assignment", "claim_assignments"),
+          _fk(asg, "claim_id", clm, "claim_id", "claim_assignments.claim_id -> claims"),
+          _fk(asg, "adjuster_id", adj, "adjuster_id", "claim_assignments.adjuster_id -> adjusters"),
+          _enum(asg, "assignment_role", ["PRIMARY", "REVIEWER"], "claim_assignments")]
+    am = (asg.merge(clm[["claim_id", "claim_type", "submitted_date"]], on="claim_id")
+             .merge(adj[["adjuster_id", "specialty", "is_active"]], on="adjuster_id"))
+    r.append(_result("claim_assignments: adjuster is active", (~am["is_active"].astype(bool)).sum()))
+    r.append(_result("claim_assignments: adjuster specialty matches claim type",
+                     (am["specialty"] != am["claim_type"]).sum()))
+    r.append(_result("claim_assignments: assigned_date between submitted_date and reference date",
+                     ((days(am["assigned_date"]) < days(am["submitted_date"])) |
+                      (days(am["assigned_date"]) > ref)).sum()))
+    primaries = asg[asg["assignment_role"] == "PRIMARY"].groupby("claim_id").size()
+    r.append(_result("claim_assignments: exactly one PRIMARY per assigned claim",
+                     int((primaries != 1).sum()) + len(set(asg["claim_id"]) - set(primaries.index))))
+    rev = (asg[asg["assignment_role"] == "REVIEWER"]
+           .merge(asg[asg["assignment_role"] == "PRIMARY"][["claim_id", "adjuster_id"]],
+                  on="claim_id", suffixes=("", "_primary")))
+    r.append(_result("claim_assignments: reviewer differs from primary adjuster",
+                     (rev["adjuster_id"] == rev["adjuster_id_primary"]).sum()))
+
+    # --- assessments ---
+    r += [_unique(asm, "assessment_id", "assessments"),
+          _pattern(asm, "assessment_id", "assessment", "assessments"),
+          _fk(asm, "claim_id", clm, "claim_id", "assessments.claim_id -> claims"),
+          _fk(asm, "adjuster_id", adj, "adjuster_id", "assessments.adjuster_id -> adjusters"),
+          _enum(asm, "eligibility_decision", ELIGIBILITY_DECISIONS, "assessments"),
+          _enum(asm, "reason_code", REASON_CODES, "assessments")]
+    r.append(_result("assessments: fraud_risk_score between 0 and 100",
+                     ((asm["fraud_risk_score"] < 0) | (asm["fraud_risk_score"] > 100)).sum()))
+    r.append(_result("assessments: every decision has a reason_text",
+                     (asm["reason_text"].fillna("").str.len() == 0).sum()))
+    r.append(_result("assessments: at most one per claim (baseline)", asm.duplicated("claim_id").sum()))
+    a2 = asm.merge(clm[["claim_id", "claimed_amount", "submitted_date"]], on="claim_id")
+    r.append(_result("assessments: eligible_amount <= claimed_amount",
+                     (a2["eligible_amount"] > a2["claimed_amount"] + 0.005).sum()))
+    r.append(_result("assessments: assessed_date between submitted_date and reference date",
+                     ((days(a2["assessed_date"]) < days(a2["submitted_date"])) |
+                      (days(a2["assessed_date"]) > ref)).sum()))
+    pairs = set(zip(asg["claim_id"], asg["adjuster_id"]))
+    r.append(_result("assessments: assessing adjuster is assigned to the claim",
+                     sum((c, a) not in pairs for c, a in zip(asm["claim_id"], asm["adjuster_id"]))))
+
+    # --- reserves ---
+    r += [_unique(rsv, "reserve_id", "reserves"), _pattern(rsv, "reserve_id", "reserve", "reserves"),
+          _fk(rsv, "claim_id", clm, "claim_id", "reserves.claim_id -> claims"),
+          _fk(rsv, "assessment_id", asm, "assessment_id", "reserves.assessment_id -> assessments"),
+          _enum(rsv, "reserve_type", ["INITIAL", "REVISED"], "reserves")]
+    rm = rsv.merge(asm[["assessment_id", "claim_id", "assessed_date", "eligible_amount"]],
+                   on="assessment_id", suffixes=("", "_asm"))
+    r.append(_result("reserves: assessment belongs to the same claim", (rm["claim_id"] != rm["claim_id_asm"]).sum()))
+    rm = (rm.merge(clm[["claim_id", "policy_id", "coverage_id"]], on="claim_id")
+            .merge(pc[["policy_id", "coverage_id", "coverage_limit", "deductible"]],
+                   on=["policy_id", "coverage_id"]))
+    init = rm[rm["reserve_type"] == "INITIAL"]
+    exp_res = np.minimum(np.maximum(init["eligible_amount"] - init["deductible"], 0),
+                         init["coverage_limit"]).round(2)
+    r.append(_result("reserves: INITIAL equals min(max(eligible - deductible, 0), limit)",
+                     ((init["reserve_amount"] - exp_res).abs() > 0.005).sum()))
+    r.append(_result("reserves: exactly one INITIAL per assessment",
+                     len(set(asm["assessment_id"]) ^ set(init["assessment_id"])) + int(init.duplicated("assessment_id").sum())))
+    r.append(_result("reserves: REVISED rows are released (0.00)",
+                     (rm[rm["reserve_type"] == "REVISED"]["reserve_amount"] != 0).sum()))
+    r.append(_result("reserves: supersedes_reserve_id set iff REVISED",
+                     ((rm["reserve_type"] == "REVISED") != rm["supersedes_reserve_id"].notna()).sum()))
+    r.append(_result("reserves: supersedes_reserve_id points to an existing reserve",
+                     (rm["supersedes_reserve_id"].notna() & ~rm["supersedes_reserve_id"].isin(rsv["reserve_id"])).sum()))
+    r.append(_result("reserves: effective_date >= assessed_date",
+                     (days(rm["effective_date"]) < days(rm["assessed_date"])).sum()))
+    r.append(_result("reserves: 0 <= reserve_amount <= coverage_limit",
+                     ((rm["reserve_amount"] < 0) | (rm["reserve_amount"] > rm["coverage_limit"])).sum()))
+
+    # --- settlements ---
+    r += [_unique(stl, "settlement_id", "settlements"),
+          _pattern(stl, "settlement_id", "settlement", "settlements"),
+          _fk(stl, "claim_id", clm, "claim_id", "settlements.claim_id -> claims"),
+          _fk(stl, "assessment_id", asm, "assessment_id", "settlements.assessment_id -> assessments"),
+          _enum(stl, "settlement_status", ["RECOMMENDED", "APPROVED", "REJECTED", "PAID", "CANCELLED"], "settlements"),
+          _enum(stl, "routing_decision", ["AUTO_APPROVE", "SENIOR_REVIEW", "INVESTIGATION", "REJECT"], "settlements")]
+    r.append(_result("settlements: at most one per claim (baseline)", stl.duplicated("claim_id").sum()))
+    sm = stl.merge(asm[["assessment_id", "claim_id", "eligibility_decision", "eligible_amount"]],
+                   on="assessment_id", suffixes=("", "_asm"))
+    r.append(_result("settlements: assessment belongs to the same claim", (sm["claim_id"] != sm["claim_id_asm"]).sum()))
+    sm = (sm.merge(clm[["claim_id", "policy_id", "coverage_id"]], on="claim_id")
+            .merge(pc[["policy_id", "coverage_id", "coverage_limit", "deductible"]],
+                   on=["policy_id", "coverage_id"]))
+    payable = sm["eligibility_decision"].isin(["ELIGIBLE", "PARTIALLY_ELIGIBLE"])
+    exp_rec = np.where(payable, np.minimum(np.maximum(sm["eligible_amount"] - sm["deductible"], 0),
+                                           sm["coverage_limit"]), 0.0)
+    r.append(_result("settlements: recommended_amount follows deductible and limit rules",
+                     ((sm["recommended_amount"] - exp_rec).abs() > 0.005).sum()))
+    r.append(_result("settlements: limit_applied equals the coverage limit",
+                     ((sm["limit_applied"] - sm["coverage_limit"]).abs() > 0.005).sum()))
+    r.append(_result("settlements: recommended and approved amounts do not exceed the limit",
+                     ((sm["recommended_amount"] > sm["limit_applied"] + 0.005) |
+                      (sm["approved_amount"].fillna(0) > sm["limit_applied"] + 0.005)).sum()))
+    approved = stl["settlement_status"].isin(["APPROVED", "PAID"])
+    r.append(_result("settlements: approved_amount and approved_date set iff APPROVED or PAID",
+                     ((approved != stl["approved_amount"].notna()) | (approved != stl["approved_date"].notna())).sum()))
+    r.append(_result("settlements: approved_amount equals recommended_amount",
+                     (approved & ((stl["approved_amount"] - stl["recommended_amount"]).abs() > 0.005)).sum()))
+    r.append(_result("settlements: paid_date set iff PAID",
+                     ((stl["settlement_status"] == "PAID") != stl["paid_date"].notna()).sum()))
+    r.append(_result("settlements: paid_date >= approved_date",
+                     (days(stl["paid_date"]) < days(stl["approved_date"])).sum()))
+    sa = stl.merge(adj[["adjuster_id", "approval_authority"]], left_on="approver_id", right_on="adjuster_id")
+    r.append(_result("settlements: approver authority covers approved_amount",
+                     (sa["approval_authority"] < sa["approved_amount"]).sum()))
+
+    # --- status_events ---
+    r += [_unique(ev, "event_id", "status_events"), _pattern(ev, "event_id", "event", "status_events"),
+          _enum(ev, "entity_type", list(TRANSITIONS), "status_events")]
+    valid_ids = {"POLICY": set(p["policy_id"]), "CLAIM": set(clm["claim_id"]),
+                 "DOCUMENT": set(doc["document_id"]), "SETTLEMENT": set(stl["settlement_id"])}
+    r.append(_result("status_events: entity_id exists in its table",
+                     sum(eid not in valid_ids.get(et, set())
+                         for et, eid in zip(ev["entity_type"], ev["entity_id"]))))
+    r.append(_result("status_events: event date not after reference date",
+                     (days(ev["event_ts"].str[:10]) > ref).sum()))
+
+    last, bad_chain, bad_transition = {}, 0, 0
+    for row in ev.sort_values("event_id").itertuples(index=False):
+        key = (row.entity_type, row.entity_id)
+        prev = last.get(key)
+        from_status = None if pd.isna(row.from_status) else row.from_status
+        bad_chain += from_status != prev
+        bad_transition += row.to_status not in TRANSITIONS[row.entity_type].get(prev, set())
+        last[key] = row.to_status
+    r.append(_result("status_events: from_status equals the entity's previous to_status", bad_chain))
+    r.append(_result("status_events: every transition is legal for its lifecycle", bad_transition))
+    for et, df, id_col, status_col in [("CLAIM", clm, "claim_id", "current_status"),
+                                       ("POLICY", p, "policy_id", "status"),
+                                       ("DOCUMENT", doc, "document_id", "status"),
+                                       ("SETTLEMENT", stl, "settlement_id", "settlement_status")]:
+        r.append(_result(f"status_events: last {et.lower()} event equals the {et.lower()}'s stored status",
+                         sum(last.get((et, i)) != s for i, s in zip(df[id_col], df[status_col]))))
     return r
 
 def print_report(results):

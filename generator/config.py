@@ -41,3 +41,4 @@ EARLY_CLAIM_DAYS = 30         # incident this soon after policy start is a fraud
 AUTO_APPROVE_MAX = 5000.0     # payouts up to this (and low fraud score) auto-approve
 REVIEW_SCORE = 30             # fraud score that forces senior review
 FRAUD_REFERRAL_SCORE = 50     # fraud score that triggers investigation
+RULE_VERSION = "RULES-1.0"
