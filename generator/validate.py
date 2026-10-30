@@ -381,15 +381,6 @@ def validate_workflow(t):
                          sum(last.get((et, i)) != s for i, s in zip(df[id_col], df[status_col]))))
     return r
 
-def print_report(results):
-    for res in results:
-        tag = "PASS" if res["passed"] else "FAIL"
-        extra = "" if res["passed"] else f"  ({res['bad_rows']} bad rows)"
-        print(f"[{tag}] {res['check']}{extra}")
-    failed = sum(not res["passed"] for res in results)
-    print(f"\n{len(results) - failed}/{len(results)} checks passed")
-    return failed
-
 def validate_rules(t):
     """Cross-entity rule checks. All pass on clean data; Layer B defects make some fail."""
     p, clm, doc = t["policies"], t["claims"], t["documents"]

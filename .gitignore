@@ -2,3 +2,9 @@
 __pycache__/
 *.pyc
 output/
+model/trained_model.joblib
+model/label_encoder.joblib
+*.egg-info/
+dist/
+build/
+.pytest_cache/
