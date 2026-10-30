@@ -1,0 +1,7 @@
+coverage_id,product_code,coverage_type,description,default_limit,default_deductible
+COV-AUTO-01,AUTO,AUTO_COLLISION,Collision damage to insured vehicle,25000.00,500.00
+COV-AUTO-02,AUTO,THEFT,Vehicle theft,20000.00,500.00
+COV-HOME-01,HOME,PROPERTY_DAMAGE,Damage to insured dwelling,150000.00,1000.00
+COV-HOME-02,HOME,THEFT,Theft of household contents,30000.00,500.00
+COV-HLTH-01,HLTH,MEDICAL,Medical and hospital expenses,50000.00,250.00
+COV-LIAB-01,LIAB,LIABILITY,Third-party liability,100000.00,1000.00

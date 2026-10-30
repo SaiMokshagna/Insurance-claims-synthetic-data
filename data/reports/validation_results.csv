@@ -1,0 +1,295 @@
+dataset,check,family,passed,bad_rows
+CLEAN,customers.customer_id is unique,Primary-key uniqueness,True,0
+CLEAN,customers.customer_id matches ID format,ID format,True,0
+CLEAN,customers.email is unique,Primary-key uniqueness,True,0
+CLEAN,customers.risk_tier has allowed values,Allowed values,True,0
+CLEAN,customers: age between 18 and 85,Date ordering,True,0
+CLEAN,customers: customer_since after 18th birthday and not in future,Business rules,True,0
+CLEAN,coverages.coverage_id is unique,Primary-key uniqueness,True,0
+CLEAN,coverages.coverage_id matches ID format,ID format,True,0
+CLEAN,coverages.product_code has allowed values,Allowed values,True,0
+CLEAN,coverages.coverage_type has allowed values,Allowed values,True,0
+CLEAN,coverages: default_deductible < default_limit,Arithmetic reconciliation,True,0
+CLEAN,adjusters.adjuster_id is unique,Primary-key uniqueness,True,0
+CLEAN,adjusters.adjuster_id matches ID format,ID format,True,0
+CLEAN,adjusters.seniority has allowed values,Allowed values,True,0
+CLEAN,adjusters.specialty has allowed values,Allowed values,True,0
+CLEAN,adjusters: authority JUNIOR < SENIOR < MANAGER,Business rules,True,0
+CLEAN,adjusters: active manager exists for every claim type,Business rules,True,0
+CLEAN,policies.policy_id is unique,Primary-key uniqueness,True,0
+CLEAN,policies.policy_id matches ID format,ID format,True,0
+CLEAN,FK policies.customer_id -> customers,Foreign keys and joins,True,0
+CLEAN,policies.product_code has allowed values,Allowed values,True,0
+CLEAN,policies.status has allowed values,Allowed values,True,0
+CLEAN,policies: product in policy_id equals product_code,Foreign keys and joins,True,0
+CLEAN,policies: effective_date < expiry_date,Date ordering,True,0
+CLEAN,policies: cancellation_date set iff CANCELLED,Date ordering,True,0
+CLEAN,policies: lapse_date set iff LAPSED,Date ordering,True,0
+CLEAN,policies: cancellation/lapse inside policy term,Date ordering,True,0
+CLEAN,policies: status matches independent re-derivation,Arithmetic reconciliation,True,0
+CLEAN,policies: effective_date not before customer_since,Date ordering,True,0
+CLEAN,policy_coverages.policy_coverage_id is unique,Primary-key uniqueness,True,0
+CLEAN,policy_coverages.policy_coverage_id matches ID format,ID format,True,0
+CLEAN,FK policy_coverages.policy_id -> policies,Foreign keys and joins,True,0
+CLEAN,FK policy_coverages.coverage_id -> coverages,Foreign keys and joins,True,0
+CLEAN,"policy_coverages: (policy_id, coverage_id) pair is unique",Primary-key uniqueness,True,0
+CLEAN,policy_coverages: deductible < coverage_limit,Arithmetic reconciliation,True,0
+CLEAN,policy_coverages: exclusion codes are allowed,Allowed values,True,0
+CLEAN,policy_coverages: coverage product matches policy product,Foreign keys and joins,True,0
+CLEAN,policy_coverages: dates inside policy term,Date ordering,True,0
+CLEAN,incidents.incident_id is unique,Primary-key uniqueness,True,0
+CLEAN,incidents.incident_id matches ID format,ID format,True,0
+CLEAN,FK incidents.policy_id -> policies,Foreign keys and joins,True,0
+CLEAN,incidents.incident_type has allowed values,Allowed values,True,0
+CLEAN,incidents: incident_date inside policy coverage period,Date ordering,True,0
+CLEAN,incidents: incident_date not in the future,Date ordering,True,0
+CLEAN,claims.claim_id is unique,Primary-key uniqueness,True,0
+CLEAN,claims.claim_id matches ID format,ID format,True,0
+CLEAN,FK claims.policy_id -> policies,Foreign keys and joins,True,0
+CLEAN,FK claims.incident_id -> incidents,Foreign keys and joins,True,0
+CLEAN,FK claims.coverage_id -> coverages,Foreign keys and joins,True,0
+CLEAN,claims: coverage is attached to the claim's policy,Foreign keys and joins,True,0
+CLEAN,claims: incident belongs to the same policy,Foreign keys and joins,True,0
+CLEAN,claims: claim_type equals incident_type,Foreign keys and joins,True,0
+CLEAN,claims: claim_type equals coverage_type,Foreign keys and joins,True,0
+CLEAN,claims: submitted_date >= incident_date and <= reference date,Date ordering,True,0
+CLEAN,claims: reporting_delay_days = submitted - incident,Arithmetic reconciliation,True,0
+CLEAN,claims: claimed_amount equals sum of its items,Arithmetic reconciliation,True,0
+CLEAN,incidents: triggered exclusion is one the coverage actually has,Allowed values,True,0
+CLEAN,claims: prior_claims_12m matches independent recount,Arithmetic reconciliation,True,0
+CLEAN,claim_items.claim_item_id is unique,Primary-key uniqueness,True,0
+CLEAN,claim_items.claim_item_id matches ID format,ID format,True,0
+CLEAN,FK claim_items.claim_id -> claims,Foreign keys and joins,True,0
+CLEAN,claim_items: claimed_amount > 0,Business rules,True,0
+CLEAN,claims: every claim has at least one item,Business rules,True,0
+CLEAN,claim_items: category allowed for the claim type,Allowed values,True,0
+CLEAN,claim_items: item ID embeds its claim_id,Foreign keys and joins,True,0
+CLEAN,documents.document_id is unique,Primary-key uniqueness,True,0
+CLEAN,documents.document_id matches ID format,ID format,True,0
+CLEAN,FK documents.claim_id -> claims,Foreign keys and joins,True,0
+CLEAN,documents.document_type has allowed values,Allowed values,True,0
+CLEAN,documents.status has allowed values,Allowed values,True,0
+CLEAN,documents: document ID embeds its claim_id,Foreign keys and joins,True,0
+CLEAN,documents: is_mandatory matches the required-documents rule,Business rules,True,0
+CLEAN,documents: received_date set iff status is received,Date ordering,True,0
+CLEAN,documents: file_name and file_size_kb set iff received,Business rules,True,0
+CLEAN,documents: received_date between submitted_date and reference date,Date ordering,True,0
+CLEAN,documents: requested_date between submitted_date and reference date,Date ordering,True,0
+CLEAN,documents: REQUESTED rows have a requested_date,Date ordering,True,0
+CLEAN,documents: each claim has every mandatory document type exactly once,Business rules,True,0
+CLEAN,claim_assignments.assignment_id is unique,Primary-key uniqueness,True,0
+CLEAN,claim_assignments.assignment_id matches ID format,ID format,True,0
+CLEAN,FK claim_assignments.claim_id -> claims,Foreign keys and joins,True,0
+CLEAN,FK claim_assignments.adjuster_id -> adjusters,Foreign keys and joins,True,0
+CLEAN,claim_assignments.assignment_role has allowed values,Allowed values,True,0
+CLEAN,claim_assignments: adjuster is active,Business rules,True,0
+CLEAN,claim_assignments: adjuster specialty matches claim type,Business rules,True,0
+CLEAN,claim_assignments: assigned_date between submitted_date and reference date,Date ordering,True,0
+CLEAN,claim_assignments: exactly one PRIMARY per assigned claim,Business rules,True,0
+CLEAN,claim_assignments: reviewer differs from primary adjuster,Foreign keys and joins,True,0
+CLEAN,assessments.assessment_id is unique,Primary-key uniqueness,True,0
+CLEAN,assessments.assessment_id matches ID format,ID format,True,0
+CLEAN,FK assessments.claim_id -> claims,Foreign keys and joins,True,0
+CLEAN,FK assessments.adjuster_id -> adjusters,Foreign keys and joins,True,0
+CLEAN,assessments.eligibility_decision has allowed values,Allowed values,True,0
+CLEAN,assessments.reason_code has allowed values,Allowed values,True,0
+CLEAN,assessments: fraud_risk_score between 0 and 100,Date ordering,True,0
+CLEAN,assessments: every decision has a reason_text,Business rules,True,0
+CLEAN,assessments: at most one per claim (baseline),Duplicate checks,True,0
+CLEAN,assessments: eligible_amount <= claimed_amount,Arithmetic reconciliation,True,0
+CLEAN,assessments: assessed_date between submitted_date and reference date,Date ordering,True,0
+CLEAN,assessments: assessing adjuster is assigned to the claim,Foreign keys and joins,True,0
+CLEAN,reserves.reserve_id is unique,Primary-key uniqueness,True,0
+CLEAN,reserves.reserve_id matches ID format,ID format,True,0
+CLEAN,FK reserves.claim_id -> claims,Foreign keys and joins,True,0
+CLEAN,FK reserves.assessment_id -> assessments,Foreign keys and joins,True,0
+CLEAN,reserves.reserve_type has allowed values,Allowed values,True,0
+CLEAN,reserves: assessment belongs to the same claim,Foreign keys and joins,True,0
+CLEAN,"reserves: INITIAL equals min(max(eligible - deductible, 0), limit)",Arithmetic reconciliation,True,0
+CLEAN,reserves: exactly one INITIAL per assessment,Business rules,True,0
+CLEAN,reserves: REVISED rows are released (0.00),Lifecycle and audit trail,True,0
+CLEAN,reserves: supersedes_reserve_id set iff REVISED,Lifecycle and audit trail,True,0
+CLEAN,reserves: supersedes_reserve_id points to an existing reserve,Foreign keys and joins,True,0
+CLEAN,reserves: effective_date >= assessed_date,Date ordering,True,0
+CLEAN,reserves: 0 <= reserve_amount <= coverage_limit,Arithmetic reconciliation,True,0
+CLEAN,settlements.settlement_id is unique,Primary-key uniqueness,True,0
+CLEAN,settlements.settlement_id matches ID format,ID format,True,0
+CLEAN,FK settlements.claim_id -> claims,Foreign keys and joins,True,0
+CLEAN,FK settlements.assessment_id -> assessments,Foreign keys and joins,True,0
+CLEAN,settlements.settlement_status has allowed values,Allowed values,True,0
+CLEAN,settlements.routing_decision has allowed values,Allowed values,True,0
+CLEAN,settlements: at most one per claim (baseline),Duplicate checks,True,0
+CLEAN,settlements: assessment belongs to the same claim,Foreign keys and joins,True,0
+CLEAN,settlements: recommended_amount follows deductible and limit rules,Arithmetic reconciliation,True,0
+CLEAN,settlements: limit_applied equals the coverage limit,Arithmetic reconciliation,True,0
+CLEAN,settlements: recommended and approved amounts do not exceed the limit,Arithmetic reconciliation,True,0
+CLEAN,settlements: approved_amount and approved_date set iff APPROVED or PAID,Date ordering,True,0
+CLEAN,settlements: approved_amount equals recommended_amount,Arithmetic reconciliation,True,0
+CLEAN,settlements: paid_date set iff PAID,Date ordering,True,0
+CLEAN,settlements: paid_date >= approved_date,Date ordering,True,0
+CLEAN,settlements: approver authority covers approved_amount,Arithmetic reconciliation,True,0
+CLEAN,status_events.event_id is unique,Primary-key uniqueness,True,0
+CLEAN,status_events.event_id matches ID format,ID format,True,0
+CLEAN,status_events.entity_type has allowed values,Allowed values,True,0
+CLEAN,status_events: entity_id exists in its table,Foreign keys and joins,True,0
+CLEAN,status_events: event date not after reference date,Date ordering,True,0
+CLEAN,status_events: from_status equals the entity's previous to_status,Lifecycle and audit trail,True,0
+CLEAN,status_events: every transition is legal for its lifecycle,Lifecycle and audit trail,True,0
+CLEAN,status_events: last claim event equals the claim's stored status,Lifecycle and audit trail,True,0
+CLEAN,status_events: last policy event equals the policy's stored status,Lifecycle and audit trail,True,0
+CLEAN,status_events: last document event equals the document's stored status,Lifecycle and audit trail,True,0
+CLEAN,status_events: last settlement event equals the settlement's stored status,Lifecycle and audit trail,True,0
+CLEAN,claims: submitted_date on or after policy effective_date,Date ordering,True,0
+CLEAN,rules: every claim is paid at most once,Duplicate checks,True,0
+CLEAN,rules: paid claims have every mandatory document,Business rules,True,0
+CLEAN,claims: claim_id order follows submitted_date,Date ordering,True,0
+CLEAN,settlements: approved_date on or after assessed_date,Date ordering,True,0
+CLEAN,rules: closed claims have a PAID or REJECTED settlement,Lifecycle and audit trail,True,0
+CLEAN,rules: paid claims have their reserve released,Lifecycle and audit trail,True,0
+FINAL,customers.customer_id is unique,Primary-key uniqueness,True,0
+FINAL,customers.customer_id matches ID format,ID format,True,0
+FINAL,customers.email is unique,Primary-key uniqueness,True,0
+FINAL,customers.risk_tier has allowed values,Allowed values,True,0
+FINAL,customers: age between 18 and 85,Date ordering,True,0
+FINAL,customers: customer_since after 18th birthday and not in future,Business rules,True,0
+FINAL,coverages.coverage_id is unique,Primary-key uniqueness,True,0
+FINAL,coverages.coverage_id matches ID format,ID format,True,0
+FINAL,coverages.product_code has allowed values,Allowed values,True,0
+FINAL,coverages.coverage_type has allowed values,Allowed values,True,0
+FINAL,coverages: default_deductible < default_limit,Arithmetic reconciliation,True,0
+FINAL,adjusters.adjuster_id is unique,Primary-key uniqueness,True,0
+FINAL,adjusters.adjuster_id matches ID format,ID format,True,0
+FINAL,adjusters.seniority has allowed values,Allowed values,True,0
+FINAL,adjusters.specialty has allowed values,Allowed values,True,0
+FINAL,adjusters: authority JUNIOR < SENIOR < MANAGER,Business rules,True,0
+FINAL,adjusters: active manager exists for every claim type,Business rules,True,0
+FINAL,policies.policy_id is unique,Primary-key uniqueness,True,0
+FINAL,policies.policy_id matches ID format,ID format,True,0
+FINAL,FK policies.customer_id -> customers,Foreign keys and joins,True,0
+FINAL,policies.product_code has allowed values,Allowed values,True,0
+FINAL,policies.status has allowed values,Allowed values,True,0
+FINAL,policies: product in policy_id equals product_code,Foreign keys and joins,True,0
+FINAL,policies: effective_date < expiry_date,Date ordering,True,0
+FINAL,policies: cancellation_date set iff CANCELLED,Date ordering,True,0
+FINAL,policies: lapse_date set iff LAPSED,Date ordering,True,0
+FINAL,policies: cancellation/lapse inside policy term,Date ordering,True,0
+FINAL,policies: status matches independent re-derivation,Arithmetic reconciliation,True,0
+FINAL,policies: effective_date not before customer_since,Date ordering,True,0
+FINAL,policy_coverages.policy_coverage_id is unique,Primary-key uniqueness,True,0
+FINAL,policy_coverages.policy_coverage_id matches ID format,ID format,True,0
+FINAL,FK policy_coverages.policy_id -> policies,Foreign keys and joins,True,0
+FINAL,FK policy_coverages.coverage_id -> coverages,Foreign keys and joins,True,0
+FINAL,"policy_coverages: (policy_id, coverage_id) pair is unique",Primary-key uniqueness,True,0
+FINAL,policy_coverages: deductible < coverage_limit,Arithmetic reconciliation,True,0
+FINAL,policy_coverages: exclusion codes are allowed,Allowed values,True,0
+FINAL,policy_coverages: coverage product matches policy product,Foreign keys and joins,True,0
+FINAL,policy_coverages: dates inside policy term,Date ordering,True,0
+FINAL,incidents.incident_id is unique,Primary-key uniqueness,True,0
+FINAL,incidents.incident_id matches ID format,ID format,True,0
+FINAL,FK incidents.policy_id -> policies,Foreign keys and joins,True,0
+FINAL,incidents.incident_type has allowed values,Allowed values,True,0
+FINAL,incidents: incident_date inside policy coverage period,Date ordering,False,40
+FINAL,incidents: incident_date not in the future,Date ordering,True,0
+FINAL,claims.claim_id is unique,Primary-key uniqueness,True,0
+FINAL,claims.claim_id matches ID format,ID format,True,0
+FINAL,FK claims.policy_id -> policies,Foreign keys and joins,True,0
+FINAL,FK claims.incident_id -> incidents,Foreign keys and joins,True,0
+FINAL,FK claims.coverage_id -> coverages,Foreign keys and joins,True,0
+FINAL,claims: coverage is attached to the claim's policy,Foreign keys and joins,True,0
+FINAL,claims: incident belongs to the same policy,Foreign keys and joins,True,0
+FINAL,claims: claim_type equals incident_type,Foreign keys and joins,True,0
+FINAL,claims: claim_type equals coverage_type,Foreign keys and joins,True,0
+FINAL,claims: submitted_date >= incident_date and <= reference date,Date ordering,True,0
+FINAL,claims: reporting_delay_days = submitted - incident,Arithmetic reconciliation,True,0
+FINAL,claims: claimed_amount equals sum of its items,Arithmetic reconciliation,True,0
+FINAL,incidents: triggered exclusion is one the coverage actually has,Allowed values,True,0
+FINAL,claims: prior_claims_12m matches independent recount,Arithmetic reconciliation,True,0
+FINAL,claim_items.claim_item_id is unique,Primary-key uniqueness,True,0
+FINAL,claim_items.claim_item_id matches ID format,ID format,True,0
+FINAL,FK claim_items.claim_id -> claims,Foreign keys and joins,True,0
+FINAL,claim_items: claimed_amount > 0,Business rules,True,0
+FINAL,claims: every claim has at least one item,Business rules,True,0
+FINAL,claim_items: category allowed for the claim type,Allowed values,True,0
+FINAL,claim_items: item ID embeds its claim_id,Foreign keys and joins,True,0
+FINAL,documents.document_id is unique,Primary-key uniqueness,True,0
+FINAL,documents.document_id matches ID format,ID format,True,0
+FINAL,FK documents.claim_id -> claims,Foreign keys and joins,True,0
+FINAL,documents.document_type has allowed values,Allowed values,True,0
+FINAL,documents.status has allowed values,Allowed values,True,0
+FINAL,documents: document ID embeds its claim_id,Foreign keys and joins,True,0
+FINAL,documents: is_mandatory matches the required-documents rule,Business rules,True,0
+FINAL,documents: received_date set iff status is received,Date ordering,True,0
+FINAL,documents: file_name and file_size_kb set iff received,Business rules,True,0
+FINAL,documents: received_date between submitted_date and reference date,Date ordering,True,0
+FINAL,documents: requested_date between submitted_date and reference date,Date ordering,True,0
+FINAL,documents: REQUESTED rows have a requested_date,Date ordering,True,0
+FINAL,documents: each claim has every mandatory document type exactly once,Business rules,True,0
+FINAL,claim_assignments.assignment_id is unique,Primary-key uniqueness,True,0
+FINAL,claim_assignments.assignment_id matches ID format,ID format,True,0
+FINAL,FK claim_assignments.claim_id -> claims,Foreign keys and joins,True,0
+FINAL,FK claim_assignments.adjuster_id -> adjusters,Foreign keys and joins,True,0
+FINAL,claim_assignments.assignment_role has allowed values,Allowed values,True,0
+FINAL,claim_assignments: adjuster is active,Business rules,True,0
+FINAL,claim_assignments: adjuster specialty matches claim type,Business rules,True,0
+FINAL,claim_assignments: assigned_date between submitted_date and reference date,Date ordering,True,0
+FINAL,claim_assignments: exactly one PRIMARY per assigned claim,Business rules,True,0
+FINAL,claim_assignments: reviewer differs from primary adjuster,Foreign keys and joins,True,0
+FINAL,assessments.assessment_id is unique,Primary-key uniqueness,True,0
+FINAL,assessments.assessment_id matches ID format,ID format,True,0
+FINAL,FK assessments.claim_id -> claims,Foreign keys and joins,True,0
+FINAL,FK assessments.adjuster_id -> adjusters,Foreign keys and joins,True,0
+FINAL,assessments.eligibility_decision has allowed values,Allowed values,True,0
+FINAL,assessments.reason_code has allowed values,Allowed values,True,0
+FINAL,assessments: fraud_risk_score between 0 and 100,Date ordering,True,0
+FINAL,assessments: every decision has a reason_text,Business rules,True,0
+FINAL,assessments: at most one per claim (baseline),Duplicate checks,True,0
+FINAL,assessments: eligible_amount <= claimed_amount,Arithmetic reconciliation,True,0
+FINAL,assessments: assessed_date between submitted_date and reference date,Date ordering,True,0
+FINAL,assessments: assessing adjuster is assigned to the claim,Foreign keys and joins,True,0
+FINAL,reserves.reserve_id is unique,Primary-key uniqueness,True,0
+FINAL,reserves.reserve_id matches ID format,ID format,True,0
+FINAL,FK reserves.claim_id -> claims,Foreign keys and joins,True,0
+FINAL,FK reserves.assessment_id -> assessments,Foreign keys and joins,True,0
+FINAL,reserves.reserve_type has allowed values,Allowed values,True,0
+FINAL,reserves: assessment belongs to the same claim,Foreign keys and joins,True,0
+FINAL,"reserves: INITIAL equals min(max(eligible - deductible, 0), limit)",Arithmetic reconciliation,True,0
+FINAL,reserves: exactly one INITIAL per assessment,Business rules,True,0
+FINAL,reserves: REVISED rows are released (0.00),Lifecycle and audit trail,True,0
+FINAL,reserves: supersedes_reserve_id set iff REVISED,Lifecycle and audit trail,True,0
+FINAL,reserves: supersedes_reserve_id points to an existing reserve,Foreign keys and joins,True,0
+FINAL,reserves: effective_date >= assessed_date,Date ordering,True,0
+FINAL,reserves: 0 <= reserve_amount <= coverage_limit,Arithmetic reconciliation,True,0
+FINAL,settlements.settlement_id is unique,Primary-key uniqueness,True,0
+FINAL,settlements.settlement_id matches ID format,ID format,True,0
+FINAL,FK settlements.claim_id -> claims,Foreign keys and joins,True,0
+FINAL,FK settlements.assessment_id -> assessments,Foreign keys and joins,True,0
+FINAL,settlements.settlement_status has allowed values,Allowed values,True,0
+FINAL,settlements.routing_decision has allowed values,Allowed values,True,0
+FINAL,settlements: at most one per claim (baseline),Duplicate checks,False,12
+FINAL,settlements: assessment belongs to the same claim,Foreign keys and joins,True,0
+FINAL,settlements: recommended_amount follows deductible and limit rules,Arithmetic reconciliation,True,0
+FINAL,settlements: limit_applied equals the coverage limit,Arithmetic reconciliation,True,0
+FINAL,settlements: recommended and approved amounts do not exceed the limit,Arithmetic reconciliation,False,15
+FINAL,settlements: approved_amount and approved_date set iff APPROVED or PAID,Date ordering,True,0
+FINAL,settlements: approved_amount equals recommended_amount,Arithmetic reconciliation,False,15
+FINAL,settlements: paid_date set iff PAID,Date ordering,True,0
+FINAL,settlements: paid_date >= approved_date,Date ordering,True,0
+FINAL,settlements: approver authority covers approved_amount,Arithmetic reconciliation,False,1
+FINAL,status_events.event_id is unique,Primary-key uniqueness,True,0
+FINAL,status_events.event_id matches ID format,ID format,True,0
+FINAL,status_events.entity_type has allowed values,Allowed values,True,0
+FINAL,status_events: entity_id exists in its table,Foreign keys and joins,True,0
+FINAL,status_events: event date not after reference date,Date ordering,True,0
+FINAL,status_events: from_status equals the entity's previous to_status,Lifecycle and audit trail,True,0
+FINAL,status_events: every transition is legal for its lifecycle,Lifecycle and audit trail,True,0
+FINAL,status_events: last claim event equals the claim's stored status,Lifecycle and audit trail,True,0
+FINAL,status_events: last policy event equals the policy's stored status,Lifecycle and audit trail,True,0
+FINAL,status_events: last document event equals the document's stored status,Lifecycle and audit trail,True,0
+FINAL,status_events: last settlement event equals the settlement's stored status,Lifecycle and audit trail,True,0
+FINAL,claims: submitted_date on or after policy effective_date,Date ordering,False,12
+FINAL,rules: every claim is paid at most once,Duplicate checks,False,12
+FINAL,rules: paid claims have every mandatory document,Business rules,False,15
+FINAL,claims: claim_id order follows submitted_date,Date ordering,True,0
+FINAL,settlements: approved_date on or after assessed_date,Date ordering,True,0
+FINAL,rules: closed claims have a PAID or REJECTED settlement,Lifecycle and audit trail,True,0
+FINAL,rules: paid claims have their reserve released,Lifecycle and audit trail,True,0

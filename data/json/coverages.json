@@ -1,0 +1,8 @@
+[
+{"coverage_id":"COV-AUTO-01","product_code":"AUTO","coverage_type":"AUTO_COLLISION","description":"Collision damage to insured vehicle","default_limit":25000.0,"default_deductible":500.0},
+{"coverage_id":"COV-AUTO-02","product_code":"AUTO","coverage_type":"THEFT","description":"Vehicle theft","default_limit":20000.0,"default_deductible":500.0},
+{"coverage_id":"COV-HOME-01","product_code":"HOME","coverage_type":"PROPERTY_DAMAGE","description":"Damage to insured dwelling","default_limit":150000.0,"default_deductible":1000.0},
+{"coverage_id":"COV-HOME-02","product_code":"HOME","coverage_type":"THEFT","description":"Theft of household contents","default_limit":30000.0,"default_deductible":500.0},
+{"coverage_id":"COV-HLTH-01","product_code":"HLTH","coverage_type":"MEDICAL","description":"Medical and hospital expenses","default_limit":50000.0,"default_deductible":250.0},
+{"coverage_id":"COV-LIAB-01","product_code":"LIAB","coverage_type":"LIABILITY","description":"Third-party liability","default_limit":100000.0,"default_deductible":1000.0}
+]

@@ -42,6 +42,7 @@ AUTO_APPROVE_MAX = 5000.0     # payouts up to this (and low fraud score) auto-ap
 REVIEW_SCORE = 30             # fraud score that forces senior review
 FRAUD_REFERRAL_SCORE = 50     # fraud score that triggers investigation
 RULE_VERSION = "RULES-1.0"
+GENERATOR_VERSION = "1.0.0"
 
 # --- Anomaly plan: counts per 1,000 claims (scaled for other sizes) ---
 ANOMALY_PLAN_PER_1000 = {

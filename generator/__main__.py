@@ -7,9 +7,9 @@ from generator.config import (
     DEFAULT_CLAIMS, DEFAULT_POLICIES, DEFAULT_SEED, REFERENCE_DATE,
 )
 from generator.detect import detect, score_detection
-from generator.export import write_ground_truth, write_tables
+from generator.export import export_dataset
 from generator.pipeline import build_dataset
-from generator.report import build_report, write_report
+from generator.report import build_report
 from generator.validate import print_report, validate_all
 
 
@@ -59,13 +59,11 @@ def main():
     print(shown.to_string(index=False))
     print(f"  Misclassified claims: {len(mismatches)}")
 
-    write_tables(final, args.out)
-    write_ground_truth(gt, args.out)
     run = {"seed": args.seed, "policies": args.policies, "claims": args.claims}
     text = build_report(run, final, gt, clean_results, final_results, problems, scores, mismatches)
-    write_report(args.out, text, clean_results, final_results)
-    print(f"\nFiles written to {args.out.resolve()} (tables, ground_truth.csv, "
-          "validation_summary.md, validation_results.csv)")
+    export_dataset(args.out, final, gt, run, (text, clean_results, final_results))
+    print(f"\nDataset written to {args.out.resolve()}")
+    print("  csv/  json/  sql/  ground_truth/  reports/  manifest.json  README.md  data_dictionary.md")
     sys.exit(1 if failed_clean or problems or len(mismatches) else 0)
 
 
